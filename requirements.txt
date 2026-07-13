@@ -1,0 +1,7 @@
+﻿pandas
+numpy
+streamlit
+plotly
+pydeck
+python-dateutil
+openpyxl
