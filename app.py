@@ -237,23 +237,23 @@ with st.container(border=True):
         )
 
     with frow2_col2:
-        st.markdown(f'<div class="filter-label">{icon_html("clock", GOLD, 15)}Delay Threshold (days)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="filter-label">{icon_html("clock", GOLD, 15)}Delay Threshold (days vs typical)</div>', unsafe_allow_html=True)
         delay_threshold = st.slider(
             "Delay threshold (days)",
             min_value=int(orders["Shipping Lead Time (Days)"].min()),
             max_value=int(orders["Shipping Lead Time (Days)"].max()),
-            value=18, label_visibility="collapsed",
-            help="Shipments slower than this are flagged as 'delayed' throughout the report.",
+            value=1, label_visibility="collapsed",
+            help="Shipments this many days slower than a typical order, or more, are flagged as 'delayed'.",
         )
         st.caption(
-            f"Range reflects actual shipping lead times in the data "
-            f"({int(orders['Shipping Lead Time (Days)'].min())}\u2013"
-            f"{int(orders['Shipping Lead Time (Days)'].max())} days)."
+            "Days slower than a typical order. Default: more than 1 day slower."
         )
 
 st.caption(
     f"Routes need {MIN_SHIPMENTS_FOR_RANKING}+ shipments to appear in efficiency rankings "
-    "(avoids small-sample noise)."
+    "(avoids small-sample noise). Lead times are shown as days faster (\u2212) or slower (+) "
+    "than a typical order: the raw ship dates carry a 2\u20134 year recording error, so true "
+    "days in transit cannot be recovered."
 )
 
 # =====================================================================
@@ -485,8 +485,8 @@ delay_css = "warn" if delay_rate > 25 else ("good" if delay_rate < 15 else "")
 
 kpi_specs = [
     ("TOTAL SHIPMENTS", f"{total_shipments:,}", "", ""),
-    ("AVG LEAD TIME", f"{avg_lead:.1f}d", "", ""),
-    ("DELAY RATE", f"{delay_rate:.1f}%", f"threshold {delay_threshold}d", delay_css),
+    ("LEAD TIME VS TYPICAL", (f"{avg_lead:+.1f}d" if abs(avg_lead) >= 0.05 else "0.0d"), "0 = typical order", ""),
+    ("DELAY RATE", f"{delay_rate:.1f}%", f"over {delay_threshold:+d}d vs typical", delay_css),
     ("ACTIVE ROUTES", f"{n_routes}", "", ""),
     ("TOTAL SALES", f"${total_sales:,.0f}", "", ""),
 ]
@@ -549,7 +549,7 @@ if active_section == "Overview":
             )
             fig_top.update_layout(**PLOTLY_LAYOUT, coloraxis_showscale=False, height=380)
             fig_top.update_xaxes(range=[0, 100])
-            st.plotly_chart(fig_top, use_container_width=True)
+            st.plotly_chart(fig_top, width="stretch")
 
         with col2:
             bottom10 = reliable_routes.nsmallest(10, "Efficiency_Score").sort_values(
@@ -564,7 +564,7 @@ if active_section == "Overview":
             )
             fig_bottom.update_layout(**PLOTLY_LAYOUT, coloraxis_showscale=False, height=380)
             fig_bottom.update_xaxes(range=[0, 100])
-            st.plotly_chart(fig_bottom, use_container_width=True)
+            st.plotly_chart(fig_bottom, width="stretch")
     
 
 elif active_section == "Route Map":
@@ -617,7 +617,7 @@ elif active_section == "Route Map":
                 "style": {"backgroundColor": ESPRESSO, "color": "white"},
             },
         )
-        st.pydeck_chart(deck, use_container_width=True, height=520)
+        st.pydeck_chart(deck, width="stretch", height=520)
         st.caption("Map requires an internet connection to load the base map tiles.")
 
         legend_html = "".join(
@@ -659,7 +659,7 @@ elif active_section == "Route Map":
                     "Avg_Lead_Time": ":.1f",
                     "Delay_Rate": ":.1%",
                 },
-                labels={"Avg_Lead_Time": "Avg Lead Time", "Delay_Rate": "Delay Rate"},
+                labels={"Avg_Lead_Time": "Lead Time vs Typical", "Delay_Rate": "Delay Rate"},
             )
             fig_map.update_layout(
                 paper_bgcolor=CARD,
@@ -672,7 +672,7 @@ elif active_section == "Route Map":
                 height=460,
                 coloraxis_colorbar=dict(title="Efficiency"),
             )
-            st.plotly_chart(fig_map, use_container_width=True)
+            st.plotly_chart(fig_map, width="stretch")
 
         canada = state_summary[state_summary["Country/Region"] == "Canada"]
         if not canada.empty:
@@ -682,10 +682,10 @@ elif active_section == "Route Map":
                 .sort_values("Efficiency_Score", ascending=False)
                 .rename(columns={
                     "State/Province": "Province", "Total_Shipments": "Shipments",
-                    "Avg_Lead_Time": "Avg Lead Time (d)", "Delay_Rate": "Delay Rate",
+                    "Avg_Lead_Time": "vs Typical (d)", "Delay_Rate": "Delay Rate",
                 })
-                .style.format({"Avg Lead Time (d)": "{:.1f}", "Delay Rate": "{:.1%}"}),
-                use_container_width=True, hide_index=True,
+                .style.format({"vs Typical (d)": "{:+.1f}", "Delay Rate": "{:.1%}"}),
+                width="stretch", hide_index=True,
             )
 
 elif active_section == "Ship Modes":
@@ -716,12 +716,12 @@ elif active_section == "Ship Modes":
             fig_lead = px.bar(
                 mode_summary, x="Ship Mode", y="Avg_Lead_Time",
                 color="Avg_Lead_Time", color_continuous_scale=[[0, SAGE], [1, TERRACOTTA]],
-                title="Average Lead Time by Ship Mode",
-                labels={"Avg_Lead_Time": "Avg Lead Time (days)"},
+                title="Lead Time vs Typical Order, by Ship Mode",
+                labels={"Avg_Lead_Time": "Lead Time vs Typical (days)"},
                 text_auto=".1f",
             )
             fig_lead.update_layout(**PLOTLY_LAYOUT, coloraxis_showscale=False, height=380)
-            st.plotly_chart(fig_lead, use_container_width=True)
+            st.plotly_chart(fig_lead, width="stretch")
 
         with col2:
             present_modes = [m for m in SHIP_MODE_ORDER if m in filtered["Ship Mode"].unique()]
@@ -731,23 +731,24 @@ elif active_section == "Ship Modes":
                 color="Ship Mode",
                 color_discrete_sequence=[GOLD, SAGE, TERRACOTTA, ESPRESSO],
                 title="Lead Time Distribution by Ship Mode",
+                labels={"Shipping Lead Time (Days)": "Days vs typical order"},
             )
             fig_box.update_layout(**PLOTLY_LAYOUT, showlegend=False, height=380)
-            st.plotly_chart(fig_box, use_container_width=True)
+            st.plotly_chart(fig_box, width="stretch")
 
         st.markdown(heading_html("trend", "Cost-Time Tradeoff (Descriptive)", level="h4"), unsafe_allow_html=True)
         display_tbl = mode_summary[
             ["Ship Mode", "Shipments", "Avg_Lead_Time", "Delay_Rate", "Avg_Sales", "Margin_Pct"]
         ].rename(columns={
-            "Avg_Lead_Time": "Avg Lead Time (d)", "Delay_Rate": "Delay Rate",
+            "Avg_Lead_Time": "vs Typical (d)", "Delay_Rate": "Delay Rate",
             "Avg_Sales": "Avg Order Value ($)", "Margin_Pct": "Avg Margin (%)",
         })
         st.dataframe(
             display_tbl.style.format({
-                "Avg Lead Time (d)": "{:.1f}", "Delay Rate": "{:.1%}",
+                "vs Typical (d)": "{:+.1f}", "Delay Rate": "{:.1%}",
                 "Avg Order Value ($)": "${:.2f}", "Avg Margin (%)": "{:.1f}%",
             }),
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
         )
 
         margin_spread = mode_summary["Margin_Pct"].max() - mode_summary["Margin_Pct"].min()
@@ -784,7 +785,7 @@ elif active_section == "Drill-Down":
 
             kcol1, kcol2, kcol3, kcol4 = st.columns(4)
             kcol1.metric("Shipments", f"{int(state_row['Total_Shipments']):,}")
-            kcol2.metric("Avg Lead Time", f"{state_row['Avg_Lead_Time']:.1f}d")
+            kcol2.metric("Lead Time vs Typical", f"{state_row['Avg_Lead_Time']:+.1f}d")
             kcol3.metric("Delay Rate", f"{state_row['Delay_Rate']*100:.1f}%")
             kcol4.metric(
                 "Efficiency Score",
@@ -805,14 +806,14 @@ elif active_section == "Drill-Down":
             )
             st.dataframe(
                 factory_breakdown.rename(columns={
-                    "Avg_Lead_Time": "Avg Lead Time (d)", "Delay_Rate": "Delay Rate",
-                }).style.format({"Avg Lead Time (d)": "{:.1f}", "Delay Rate": "{:.1%}"}),
-                use_container_width=True, hide_index=True,
+                    "Avg_Lead_Time": "vs Typical (d)", "Delay_Rate": "Delay Rate",
+                }).style.format({"vs Typical (d)": "{:+.1f}", "Delay Rate": "{:.1%}"}),
+                width="stretch", hide_index=True,
             )
 
             st.markdown(heading_html("trend", "Monthly Trend", level="h4"), unsafe_allow_html=True)
             st.caption(
-                f"Average shipping lead time to {selected_state}, by month. "
+                f"Lead time vs a typical order for {selected_state}, by month. "
                 "The dashed line marks your current delay threshold."
             )
 
@@ -826,7 +827,7 @@ elif active_section == "Drill-Down":
 
             fig_trend = px.line(
                 monthly, x="Month", y="Avg_Lead_Time", markers=True,
-                labels={"Avg_Lead_Time": "Avg Lead Time (days)"},
+                labels={"Avg_Lead_Time": "Lead Time vs Typical (days)"},
             )
             fig_trend.update_traces(line_color=GOLD, marker=dict(color=ESPRESSO, size=7))
             fig_trend.add_hline(
@@ -834,7 +835,7 @@ elif active_section == "Drill-Down":
                 annotation_text="Delay threshold", annotation_position="top left",
             )
             fig_trend.update_layout(**PLOTLY_LAYOUT, height=320)
-            st.plotly_chart(fig_trend, use_container_width=True)
+            st.plotly_chart(fig_trend, width="stretch")
 
             fig_volume = px.bar(
                 monthly, x="Month", y="Shipments",
@@ -842,7 +843,7 @@ elif active_section == "Drill-Down":
             )
             fig_volume.update_traces(marker_color=GOLD)
             fig_volume.update_layout(**PLOTLY_LAYOUT, height=220)
-            st.plotly_chart(fig_volume, use_container_width=True)
+            st.plotly_chart(fig_volume, width="stretch")
 
 elif active_section == "Findings":
     st.markdown(heading_html("lightbulb", "Key Findings"), unsafe_allow_html=True)
