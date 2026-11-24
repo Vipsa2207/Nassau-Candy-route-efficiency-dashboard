@@ -80,7 +80,12 @@ python src/feature_engineering.py
 
 ## Research paper
 
-I authored a research paper on this project (JETIR paper ID 584017, accepted, not published). A revised version will be added to this repository.
+I authored a research paper on this project (JETIR paper ID 584017, accepted, not published).
+
+- [Research paper, revised version (PDF)](docs/Research_Paper_Revised.pdf)
+- [Executive summary, revised version (PDF)](docs/Executive_Summary_Revised.pdf)
+
+The revised version (November 2026) replaces the original date-correction method and updates every figure and finding that depended on it.
 
 ## How I built it
 
