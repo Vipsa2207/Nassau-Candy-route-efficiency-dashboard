@@ -20,36 +20,37 @@ Nassau Candy ships 15 products from 5 factories to customers in 59 US states and
 
 ## Key findings
 
-- **Ship mode drives delivery time, not region.** Average lead time differs by **4.6 days** across ship modes (Same Day fastest, Standard Class slowest), but by only **0.24 days** across the four regions.
-- **The same pattern shows in delays.** Under the app's delay measure, the delay rate varies by **30.9 percentage points** across ship modes (Standard Class 30.9%, First Class and Same Day 0%) and by only about **1 point** across regions (20.5%–21.5%).
+- **Ship mode drives delivery time, not region.** Same Day orders arrive about **5.0 days** sooner than Standard Class. Across the four regions, average lead time differs by only **0.13 days**.
+- **The same pattern shows in delays.** The delay rate varies by **30.3 percentage points** across ship modes (Standard Class 30.3%, First Class and Same Day 0%) but by only **1.3 points** across regions (17.5%–18.8%).
 - **Faster shipping is the lever, not rerouting.** Moving production to a different factory or region would barely change delivery time. Changing how orders ship would.
+- **Order value doesn't explain it.** Average order value and margin are almost identical across ship modes, so Standard Class isn't slow because it carries cheaper orders.
 
 ## How it works
 
-1. **Clean the data** (`src/clean_data.py`). The raw ship dates are 2.5 to 4.5 years after the order dates, which is impossible. The script rebuilds a lead time from the remainder after dividing by 30 days (see Limitations), and links each product to its factory.
-2. **Build features** (`src/feature_engineering.py`). Each order is flagged as delayed if its lead time is over 18 days (the 75th percentile). Each route (factory → state) gets an **efficiency score** from 0 to 100:
+1. **Fix the ship dates** (`src/clean_data.py`). Raw ship dates are 2 to 4 whole years after the order dates, which is impossible, and the extra years depend on when the order was placed. The script puts each order into its year-offset group and measures it against that group's typical order. Lead time becomes **days faster (−) or slower (+) than a typical order**.
+2. **Build features** (`src/feature_engineering.py`). An order is **delayed** if it is more than 1 day slower than typical (18.3% of orders). Each route (factory → state) gets an **efficiency score** from 0 to 100:
    - 50% speed (lower average lead time)
    - 30% consistency (lower spread of lead times)
    - 20% reliability (lower delay rate)
 3. **The dashboard** (`app.py`) has filters for region, ship mode, order month and the delay threshold, and five sections:
    - **Overview:** route leaderboard, top and bottom 10 routes
-   - **Route Map:** factory-to-state shipping flows on a map
-   - **Ship Modes:** speed, delays and cost by ship mode
+   - **Route Map:** factory-to-region shipping flows on a map
+   - **Ship Modes:** speed, delays and order value by ship mode
    - **Drill-Down:** one state's factories and monthly trend
    - **Findings:** auto-written insights from the filtered data
 
 ## How well it works
 
-- **Small routes are excluded from rankings.** Only routes with 5 or more shipments are ranked (120 of 196). The 76 smaller routes would produce extreme scores from one or two orders.
-- **Large routes score close together.** Among the 41 routes with 50+ shipments, scores range only from 47.6 to 63.9. That fits the main finding: route matters less than ship mode.
-- **The ship-mode comparison holds up.** Ship modes are spread evenly across the date-error groups described below, so the differences between them are reliable even though the exact day counts are not.
+- **The ship-date fix checks out.** After it, the four ship modes line up from fastest to slowest (Same Day −4.0, First Class −1.8, Second Class −0.8, Standard Class +1.0 days), and 2024 and 2025 orders run at the same speed (within 0.2 days). Under an earlier method (remainder after dividing by 30), California's 2025 orders wrongly looked about 6 days slower than its 2024 orders.
+- **Small routes are excluded from rankings.** Only routes with 5 or more shipments are ranked (120 of 196), so one or two orders can't produce an extreme score.
+- **State and factory findings rest on thin data.** The slowest state with 30+ shipments, Nevada (35.9% delayed), has only 39 shipments. Sugar Shack (24.2%) has only 33. Treat both as leads to investigate, not conclusions.
 
 ## Limitations
 
-- **Corrupted ship dates.** Raw lead times cluster at about 908, 1,273 and 1,639 days: the same short delivery plus 2, 3 or 4 extra years. The "remainder after 30 days" fix is an assumption, and it produces some unrealistic values, such as Same Day orders averaging 10 days.
-- **Absolute delay rates are not reliable.** Every order flagged as delayed comes from the 4-extra-years group. The delay rate partly measures the date error, so only comparisons between groups should be used.
-- **Thin data for two factories.** Sugar Shack has 33 shipments and The Other Factory 100, out of 10,194.
-- **The efficiency score's weights were set by hand,** not tested against outcomes.
+- **True days in transit are unknown.** The fix recovers how much faster or slower each order was than typical, not how many days it actually took.
+- **The fix assumes each year-offset group has the same typical speed.** This is supported by ship modes being spread evenly across the groups, but it cannot be proven from this data.
+- **The efficiency score's weights were set by hand,** and scores are relative to whatever is filtered, so they are not fixed ratings.
+- **Sample data.** The dataset was provided for the internship and appears to be a sample, not Nassau Candy's own records.
 
 ## Run it locally
 
@@ -79,11 +80,16 @@ python src/feature_engineering.py
 
 ## Research paper
 
-I authored a research paper on this project (JETIR paper ID 584017, accepted, not published). A revised version will be added to this repository.
+I authored a research paper on this project (JETIR paper ID 584017, accepted, not published).
+
+- [Research paper, revised version (PDF)](docs/Research_Paper_Revised.pdf)
+- [Executive summary, revised version (PDF)](docs/Executive_Summary_Revised.pdf)
+
+The revised version (November 2026) replaces the original date-correction method and updates every figure and finding that depended on it.
 
 ## How I built it
 
-I used AI to help write the Python code. I framed the business question, worked through the ship-date problem, checked the outputs against the data, and wrote the findings.
+I used AI to help write the Python code. I framed the business question, worked through the ship-date problem, checked the outputs against the data, and wrote the findings. A later audit replaced the original date fix with a more accurate one.
 
 ## Author
 

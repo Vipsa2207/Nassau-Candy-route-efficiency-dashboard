@@ -9,8 +9,8 @@ CLEAN_PATH = "data/nassau_candy_cleaned.csv"
 ORDERS_OUT = "data/nassau_candy_features.csv"
 ROUTES_OUT = "data/route_summary.csv"
 
-DELAY_THRESHOLD_DAYS = 18  # default = 75th percentile of lead time distribution
-                           # (Streamlit app lets users override this with a slider)
+DELAY_THRESHOLD_DAYS = 1   # delayed = more than 1 day slower than a typical order
+                           # (flags about 18% of orders; the app slider can change it)
 
 df = pd.read_csv(CLEAN_PATH)
 df["Order Date"] = pd.to_datetime(df["Order Date"])

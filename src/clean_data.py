@@ -17,20 +17,28 @@ df["Order Date"] = pd.to_datetime(df["Order Date"], format="%d-%m-%Y")
 df["Ship Date"] = pd.to_datetime(df["Ship Date"], format="%d-%m-%Y")
 
 # 3. FIX THE SHIP DATE ANOMALY
-# Raw (Ship Date - Order Date) ranges ~900-1640 days -- a multi-year
-# corruption bug, not real. The short-cycle signal survives underneath it,
-# so we recover it with modular arithmetic (mod 30) instead of discarding
-# the field. Validated below: result increases Same Day -> Standard Class,
-# matching real shipping logic.
+# Raw (Ship Date - Order Date) clusters at about 908, 1,273 and 1,639 days:
+# the same short delivery plus 2, 3 or 4 whole extra years. The extra years
+# depend on the order date (2024 orders: +2 or +3 years; 2025 orders: +3 or +4),
+# so they are an error, not shipping speed.
+# Fix: assign each order to its year-offset group, then measure it against the
+# median of that group. The result is "days faster (-) or slower (+) than a
+# typical order". Centring each group on its own median also absorbs the
+# 2028 leap day. The true number of days in transit cannot be recovered.
+# (An earlier version used Raw % 30; that mixed the year offset into lead
+# time, so 2025 orders looked about 6 days slower than 2024 orders.)
 df["Raw Lead Time (days)"] = (df["Ship Date"] - df["Order Date"]).dt.days
-df["Shipping Lead Time (Days)"] = df["Raw Lead Time (days)"] % 30
+df["Year Offset Group"] = ((df["Raw Lead Time (days)"] - 908) / 365.25).round().astype(int)
+group_median = df.groupby("Year Offset Group")["Raw Lead Time (days)"].transform("median")
+df["Shipping Lead Time (Days)"] = df["Raw Lead Time (days)"] - group_median
 
-print("\nLead time sanity check by Ship Mode (should increase Same Day -> Standard):")
-print(df.groupby("Ship Mode")["Shipping Lead Time (Days)"].mean().sort_values())
+print("\nYear-offset groups (rows, median raw days):")
+print(df.groupby("Year Offset Group")["Raw Lead Time (days)"].agg(["size", "median"]))
+print("\nRelative lead time by Ship Mode (should rise from Same Day to Standard):")
+print(df.groupby("Ship Mode")["Shipping Lead Time (Days)"].mean().sort_values().round(2))
 
 # 4. VALIDATE / DROP IMPOSSIBLE ROWS
 before = len(df)
-df = df[df["Shipping Lead Time (Days)"] >= 0]
 df = df.dropna(subset=["Order Date", "Ship Date", "Sales", "Units"])
 print(f"\nDropped {before - len(df)} invalid rows")
 
