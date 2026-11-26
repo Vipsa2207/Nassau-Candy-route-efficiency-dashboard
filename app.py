@@ -688,8 +688,9 @@ elif active_section == "Route Map":
                 .rename(columns={
                     "State/Province": "Province", "Total_Shipments": "Shipments",
                     "Avg_Lead_Time": "vs Typical (d)", "Delay_Rate": "Delay Rate",
+                    "Efficiency_Score": "Efficiency Score",
                 })
-                .style.format({"vs Typical (d)": "{:+.1f}", "Delay Rate": "{:.1%}"}),
+                .style.format({"vs Typical (d)": "{:+.1f}", "Delay Rate": "{:.1%}", "Efficiency Score": "{:.1f}"}),
                 width="stretch", hide_index=True,
             )
 
