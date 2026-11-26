@@ -464,8 +464,9 @@ def build_flow_arcs(df):
     fr["Region_Lon"] = fr["Region"].map(lambda r: REGION_COORDS[r][1])
 
     factory_coords = df[["Factory", "Factory Lat", "Factory Lon"]].drop_duplicates().set_index("Factory")
-    fr["Factory Lat"] = fr["Factory"].map(factory_coords["Factory Lat"])
-    fr["Factory Lon"] = fr["Factory"].map(factory_coords["Factory Lon"])
+    # pydeck cannot read column names with spaces, so use underscore names for the map
+    fr["Factory_Lat"] = fr["Factory"].map(factory_coords["Factory Lat"])
+    fr["Factory_Lon"] = fr["Factory"].map(factory_coords["Factory Lon"])
     fr["color"] = fr["Efficiency_Score"].apply(efficiency_to_color)
 
     max_ship = fr["Total_Shipments"].max()
@@ -578,14 +579,14 @@ elif active_section == "Route Map":
         st.caption(
             f"Showing {len(flow_arcs)} factory-to-region flows. Arc color reflects Efficiency "
             "Score: terracotta (low) &rarr; gold &rarr; sage (high). Arc thickness reflects "
-            "shipment volume on that flow. Squares mark the 5 Nassau Candy factories.",
+            "shipment volume on that flow. Dark dots mark the 5 Nassau Candy factories.",
             unsafe_allow_html=True,
         )
 
         arc_layer = pdk.Layer(
             "ArcLayer",
             data=flow_arcs,
-            get_source_position=["Factory Lon", "Factory Lat"],
+            get_source_position=["Factory_Lon", "Factory_Lat"],
             get_target_position=["Region_Lon", "Region_Lat"],
             get_source_color=[139, 111, 78, 160],
             get_target_color="color",
@@ -595,11 +596,15 @@ elif active_section == "Route Map":
             auto_highlight=True,
         )
 
-        factory_points = filtered[["Factory", "Factory Lat", "Factory Lon"]].drop_duplicates()
+        factory_points = (
+            filtered[["Factory", "Factory Lat", "Factory Lon"]]
+            .drop_duplicates()
+            .rename(columns={"Factory Lat": "Factory_Lat", "Factory Lon": "Factory_Lon"})
+        )
         factory_layer = pdk.Layer(
             "ScatterplotLayer",
             data=factory_points,
-            get_position=["Factory Lon", "Factory Lat"],
+            get_position=["Factory_Lon", "Factory_Lat"],
             get_fill_color=[43, 33, 24, 220],
             get_radius=50000,
             pickable=True,
